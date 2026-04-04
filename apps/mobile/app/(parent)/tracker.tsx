@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, Text, View } from 'react-native';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
@@ -136,18 +136,62 @@ function ETACard({
 
 // ─── Offline State ────────────────────────────────────────────────────────────
 
-function OfflineState() {
+function OfflineState({ reason, busId }: { reason: 'no-bus-assigned' | 'bus-offline'; busId: string | null }) {
+	const title = reason === 'no-bus-assigned' ? 'Bus not assigned yet' : "Bus hasn't started yet";
+	const subtitle = reason === 'no-bus-assigned'
+		? 'Your parent session currently has no bus linked. Logout and login again after assignment is created.'
+		: "You'll see the live position as soon as the driver goes online.";
+	const busLabel = busId ? `Bus • ${busId.slice(0, 8)}` : 'Bus • pending assignment';
+
 	return (
-		<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+		<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
 			<View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#0d1a33', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
 				<Ionicons name="bus" size={48} color="#2574ff" />
 			</View>
 			<Text style={{ color: '#fff', fontSize: 20, fontWeight: '700', textAlign: 'center', marginBottom: 8 }}>
-				Bus hasn't started yet
+				{title}
 			</Text>
 			<Text style={{ color: '#666', fontSize: 14, textAlign: 'center', lineHeight: 20 }}>
-				You'll see the live position as soon as the driver goes online.
+				{subtitle}
 			</Text>
+
+			<View
+				style={{
+					width: '100%',
+					marginTop: 24,
+					backgroundColor: '#15151a',
+					borderRadius: 16,
+					paddingVertical: 14,
+					paddingHorizontal: 14,
+					opacity: 0.62,
+					borderWidth: 1,
+					borderColor: '#2a2a35',
+				}}
+			>
+				<View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+					<View>
+						<Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Today's Trip</Text>
+						<Text style={{ color: '#8f8f9a', fontSize: 12, marginTop: 2 }}>{busLabel}</Text>
+					</View>
+					<View style={{ backgroundColor: '#2a1a0a', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 4 }}>
+						<Text style={{ color: '#ff9f0a', fontSize: 11, fontWeight: '700' }}>Not Started Yet</Text>
+					</View>
+				</View>
+				<View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
+					<View style={{ flex: 1, backgroundColor: '#1b1b22', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}>
+						<Text style={{ color: '#6f6f7a', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.7 }}>ETA</Text>
+						<Text style={{ color: '#a8a8b2', fontSize: 16, fontWeight: '700', marginTop: 2 }}>--</Text>
+					</View>
+					<View style={{ flex: 1, backgroundColor: '#1b1b22', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}>
+						<Text style={{ color: '#6f6f7a', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.7 }}>Speed</Text>
+						<Text style={{ color: '#a8a8b2', fontSize: 16, fontWeight: '700', marginTop: 2 }}>0 km/h</Text>
+					</View>
+					<View style={{ flex: 1, backgroundColor: '#1b1b22', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}>
+						<Text style={{ color: '#6f6f7a', fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.7 }}>Status</Text>
+						<Text style={{ color: '#ff9f0a', fontSize: 13, fontWeight: '700', marginTop: 4 }}>Standby</Text>
+					</View>
+				</View>
+			</View>
 		</View>
 	);
 }
@@ -216,6 +260,16 @@ export default function TrackerScreen() {
 		message: string;
 		key: string;
 	} | null>(null);
+	const [bannerQueue, setBannerQueue] = useState<
+		{ type: 'sos' | 'deviation'; message: string; key: string }[]
+	>([]);
+	const bannerKeysRef = useRef<Set<string>>(new Set());
+
+	const enqueueBanner = useCallback((banner: { type: 'sos' | 'deviation'; message: string; key: string }) => {
+		if (bannerKeysRef.current.has(banner.key)) return;
+		bannerKeysRef.current.add(banner.key);
+		setBannerQueue((prev) => [...prev, banner]);
+	}, []);
 
 	useEffect(() => {
 		loadSession().then((s) => {
@@ -224,27 +278,34 @@ export default function TrackerScreen() {
 	}, []);
 
 	const busId = session?.bus_id ?? null;
+	const offlineReason: 'no-bus-assigned' | 'bus-offline' = busId ? 'bus-offline' : 'no-bus-assigned';
 
 	const { location, busOnline, eta, sosEvent, deviationAlert, connected } =
 		useBusRealtime({ busId, distanceMetres: PLACEHOLDER_DISTANCE_M });
 
 	useEffect(() => {
+		if (activeBanner || bannerQueue.length === 0) return;
+		setActiveBanner(bannerQueue[0]);
+		setBannerQueue((prev) => prev.slice(1));
+	}, [activeBanner, bannerQueue]);
+
+	useEffect(() => {
 		if (!sosEvent) return;
-		setActiveBanner({
+		enqueueBanner({
 			type: 'sos',
 			message: "🚨 Emergency SOS triggered on your child's bus!",
 			key: sosEvent.id,
 		});
-	}, [sosEvent]);
+	}, [enqueueBanner, sosEvent]);
 
 	useEffect(() => {
 		if (!deviationAlert) return;
-		setActiveBanner({
+		enqueueBanner({
 			type: 'deviation',
 			message: `⚠️ Bus is ${Math.round(deviationAlert.distance_m)}m off the planned route.`,
 			key: deviationAlert.id,
 		});
-	}, [deviationAlert]);
+	}, [deviationAlert, enqueueBanner]);
 
 	useEffect(() => {
 		if (!location || !mapRef.current) return;
@@ -312,7 +373,7 @@ export default function TrackerScreen() {
 							<ETACard etaMinutes={eta.etaMinutes} etaTime={eta.etaTime} speedKmh={location.speed_kmh} />
 						</View>
 					) : (
-						<OfflineState />
+						<OfflineState reason={offlineReason} busId={busId} />
 					)
 				) : (
 					<NotificationsPanel busId={busId} />

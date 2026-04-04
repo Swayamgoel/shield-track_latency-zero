@@ -26,10 +26,11 @@ function AlertRow({ item }: { item: AlertItem }) {
 		? 'Emergency triggered by driver. Authorities have been notified.'
 		: `Bus was ${Math.round((item.data as DeviationAlert).distance_m)}m off the planned route.`;
 	const resolved = isSos ? !!(item.data as SOSEvent).resolved_at : undefined;
+	const chipBg = isSos ? 'rgba(255, 59, 48, 0.16)' : 'rgba(255, 159, 10, 0.16)';
 
 	return (
 		<View style={{ flexDirection: 'row', backgroundColor: '#15151a', borderRadius: 16, padding: 14, gap: 12, alignItems: 'flex-start', borderLeftWidth: 4, borderLeftColor: accent, marginBottom: 10 }}>
-			<View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: `${accent}22`, alignItems: 'center', justifyContent: 'center' }}>
+			<View style={{ width: 38, height: 38, borderRadius: 10, backgroundColor: chipBg, alignItems: 'center', justifyContent: 'center' }}>
 				<Ionicons name={isSos ? 'warning' : 'alert-circle'} size={20} color={accent} />
 			</View>
 			<View style={{ flex: 1 }}>
