@@ -16,6 +16,8 @@ interface UseDashboardRealtimeDataArgs {
   tenantId: string;
 }
 
+const LOCATION_STALE_WINDOW_MS = 90_000;
+
 function isTerminalTripStatus(status: unknown): boolean {
   if (typeof status !== "string") return false;
   const normalized = status.trim().toLowerCase();
@@ -155,30 +157,60 @@ export default function useDashboardRealtimeData({
     }
   }, []);
 
+  const refreshLatestBusLocations = useCallback(async () => {
+    const requestTenantId = tenantId;
+    const { data, error } = await supabase
+      .from("latest_bus_locations")
+      .select("*")
+      .eq("tenant_id", tenantId);
+
+    if (tenantIdRef.current !== requestTenantId) return;
+
+    if (error) {
+      console.error("Failed to refresh latest bus locations:", error.message);
+      return;
+    }
+
+    if (!data) return;
+
+    const now = Date.now();
+    setBuses((prev) => {
+      const next = { ...prev };
+
+      data.forEach((item: BusLocation) => {
+        const recordedMs = Date.parse(item.recorded_at ?? "");
+        if (Number.isNaN(recordedMs)) return;
+        if (now - recordedMs > LOCATION_STALE_WINDOW_MS) return;
+
+        const current = next[item.bus_id];
+        if (!current || isNewerRecord(current.recorded_at, item.recorded_at)) {
+          next[item.bus_id] = item;
+        }
+      });
+
+      Object.entries(next).forEach(([busId, location]) => {
+        const recordedMs = Date.parse(location.recorded_at ?? "");
+        if (
+          Number.isNaN(recordedMs) ||
+          now - recordedMs > LOCATION_STALE_WINDOW_MS
+        ) {
+          delete next[busId];
+        }
+      });
+
+      return next;
+    });
+  }, [tenantId]);
+
   useEffect(() => {
     fetchFleet();
     fetchStudents();
     fetchRoutes();
 
-    const loadInitialData = async () => {
-      const requestTenantId = tenantId;
-      const { data } = await supabase
-        .from("latest_bus_locations")
-        .select("*")
-        .eq("tenant_id", tenantId);
-
-      if (tenantIdRef.current !== requestTenantId) return;
-
-      if (data) {
-        const initialMap: Record<string, BusLocation> = {};
-        data.forEach((item: BusLocation) => {
-          initialMap[item.bus_id] = item;
-        });
-        setBuses(initialMap);
-      }
-    };
-
-    loadInitialData();
+    void refreshLatestBusLocations();
+    const pollingInterval = setInterval(() => {
+      void refreshLatestBusLocations();
+    }, 8_000);
 
     const subscription = supabase
       .channel(`fleet-updates-${tenantId}`)
@@ -360,12 +392,25 @@ export default function useDashboardRealtimeData({
           });
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.warn(
+            `[realtime] fleet-updates-${tenantId} status=${status}. Polling fallback remains active.`,
+          );
+        }
+      });
 
     return () => {
+      clearInterval(pollingInterval);
       supabase.removeChannel(subscription);
     };
-  }, [fetchFleet, fetchStudents, fetchRoutes, tenantId]);
+  }, [
+    fetchFleet,
+    fetchStudents,
+    fetchRoutes,
+    refreshLatestBusLocations,
+    tenantId,
+  ]);
 
   return {
     buses,

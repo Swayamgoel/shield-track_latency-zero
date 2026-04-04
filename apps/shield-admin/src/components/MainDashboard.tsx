@@ -5,6 +5,7 @@ import { supabase } from "../supabase";
 import type { RouteOption, RouteStop } from "../supabase";
 
 import DashboardMap from "./dashboard/DashboardMap";
+import type { InactiveFleetMarker } from "./dashboard/DashboardMap";
 import DashboardSidebar, {
   type DashboardTabId,
 } from "./dashboard/DashboardSidebar";
@@ -15,6 +16,7 @@ import MapLegend from "./dashboard/MapLegend";
 import {
   APPROVED_REROUTES_STORAGE_KEY,
   extractRouteDestination,
+  extractRouteOrigin,
   formatTime,
   getConfidenceMeta,
   getSavedMapView,
@@ -135,6 +137,33 @@ export default function MainDashboard({
   const activeBuses = Object.values(buses);
   const activeBusIds = Object.keys(buses);
   const activeBusIdsKey = activeBusIds.join("|");
+
+  const inactiveFleetMarkers = useMemo<InactiveFleetMarker[]>(() => {
+    const activeSet = new Set(activeBusIds);
+    const routeById = new Map(routesCatalog.map((route) => [route.id, route]));
+
+    const markers: InactiveFleetMarker[] = [];
+
+    fleetList.forEach((bus) => {
+      if (activeSet.has(bus.id)) return;
+
+      const defaultRoute = bus.default_route_id
+        ? routeById.get(bus.default_route_id)
+        : undefined;
+      const origin = extractRouteOrigin(defaultRoute);
+      if (!origin) return;
+
+      markers.push({
+        busId: bus.id,
+        plateNumber: bus.plate_number,
+        lat: origin.lat,
+        lng: origin.lng,
+        routeName: defaultRoute?.name ?? null,
+      });
+    });
+
+    return markers;
+  }, [activeBusIdsKey, fleetList, routesCatalog]);
 
   useEffect(() => {
     fetchLatestInsights(activeBusIds);
@@ -467,6 +496,7 @@ export default function MainDashboard({
           onMapClick={mapClickHandler}
           onMapDrag={() => setFollowLiveTracking(false)}
           activeBuses={activeBuses}
+          inactiveFleetMarkers={inactiveFleetMarkers}
           fleetList={fleetList}
           etaByBus={etaByBus}
           showStudentsOnMap={showStudentsOnMap}

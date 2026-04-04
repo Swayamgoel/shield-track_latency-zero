@@ -177,3 +177,56 @@ export function extractRouteDestination(route: Route | undefined): {
 
   return null;
 }
+
+export function extractRouteOrigin(route: Route | undefined): {
+  lat: number;
+  lng: number;
+} | null {
+  if (!route) return null;
+
+  const stops = Array.isArray(route.stops)
+    ? [...route.stops].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    : [];
+
+  if (stops.length > 0) {
+    const firstStop = stops[0];
+    if (
+      typeof firstStop.lat === "number" &&
+      Number.isFinite(firstStop.lat) &&
+      typeof firstStop.lng === "number" &&
+      Number.isFinite(firstStop.lng)
+    ) {
+      return { lat: firstStop.lat, lng: firstStop.lng };
+    }
+  }
+
+  const polyline = Array.isArray(route.polyline)
+    ? (route.polyline as Array<[number, number] | { lat: number; lng: number }>)
+    : [];
+
+  if (polyline.length === 0) return null;
+
+  const firstPoint = polyline[0];
+  if (Array.isArray(firstPoint) && firstPoint.length >= 2) {
+    const lat = Number(firstPoint[0]);
+    const lng = Number(firstPoint[1]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng };
+    }
+  }
+
+  if (
+    typeof firstPoint === "object" &&
+    firstPoint &&
+    "lat" in firstPoint &&
+    "lng" in firstPoint
+  ) {
+    const lat = Number(firstPoint.lat);
+    const lng = Number(firstPoint.lng);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      return { lat, lng };
+    }
+  }
+
+  return null;
+}

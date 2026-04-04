@@ -40,6 +40,7 @@ interface DashboardMapProps {
   onMapClick: ((lat: number, lng: number, address: string) => void) | null;
   onMapDrag?: () => void;
   activeBuses: BusLocation[];
+  inactiveFleetMarkers: InactiveFleetMarker[];
   fleetList: Bus[];
   etaByBus: Record<string, BusEtaPrediction>;
   showStudentsOnMap: boolean;
@@ -79,6 +80,27 @@ function getBusIcon(isMoving: boolean) {
     `bus-marker ${isMoving ? "bus-moving" : "bus-idle"} cursor-pointer`,
     [48, 54], // increased height for pointer tail
     [24, 54], // anchor at bottom point
+  );
+}
+
+export interface InactiveFleetMarker {
+  busId: string;
+  plateNumber: string;
+  lat: number;
+  lng: number;
+  routeName: string | null;
+}
+
+function getOfflineBusIcon() {
+  return renderReactIcon(
+    <PiBusBold
+      size={26}
+      color="white"
+      style={{ filter: "drop-shadow(0px 2px 2px rgba(0,0,0,0.3))" }}
+    />,
+    "bus-marker bus-offline cursor-pointer",
+    [48, 54],
+    [24, 54],
   );
 }
 
@@ -241,6 +263,7 @@ export default function DashboardMap({
   onMapClick,
   onMapDrag,
   activeBuses,
+  inactiveFleetMarkers,
   fleetList,
   etaByBus,
   showStudentsOnMap,
@@ -355,6 +378,48 @@ export default function DashboardMap({
           </Marker>
         );
       })}
+
+      {activeTab === "fleet" &&
+        inactiveFleetMarkers.map((bus) => (
+          <Marker
+            key={`offline-${bus.busId}`}
+            position={[bus.lat, bus.lng]}
+            icon={getOfflineBusIcon()}
+            draggable={false}
+            interactive={true}
+          >
+            <Popup className="bus-popup custom-popup" autoPan={false}>
+              <div className="w-48 flex flex-col font-sans">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <div className="w-2 h-2 rounded-full bg-gray-500"></div>
+                  <span className="text-sm font-extrabold text-gray-900 m-0 tracking-tight">
+                    {bus.plateNumber}
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-1.5 text-[11px]">
+                  <div className="flex justify-between items-center bg-gray-50/50 px-1 py-0.5 rounded">
+                    <span className="text-gray-400 font-medium">Status</span>
+                    <span className="font-bold text-gray-700">
+                      Registered (offline)
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center bg-gray-50/50 px-1 py-0.5 rounded">
+                    <span className="text-gray-400 font-medium">Route</span>
+                    <span className="font-bold text-gray-700 text-right truncate max-w-25">
+                      {bus.routeName ?? "No default route"}
+                    </span>
+                  </div>
+
+                  <div className="mt-1 pt-2 border-t border-gray-100 text-[10px] text-gray-500">
+                    Waiting for the first GPS heartbeat.
+                  </div>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
 
       {showStudentsOnMap &&
         studentsWithLocation.map((student) => (
