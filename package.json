@@ -1,0 +1,28 @@
+{
+  "name": "shieldtrack",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "preinstall": "npx only-allow pnpm",
+    "setup": "pnpm install",
+    "lint": "pnpm --filter shield-admin lint",
+    "type-check": "pnpm --filter mobile check-types && pnpm --filter api check-types && pnpm --filter @shieldtrack/types check-types && pnpm --filter @shieldtrack/utils check-types",
+    "clean": "node ./scripts/clean.js",
+    "cache:clean": "node ./scripts/cache-clean.js",
+    "clean:all": "pnpm run clean && pnpm run cache:clean",
+    "validate": "node ./scripts/validate.js",
+    "dev:admin": "pnpm --filter shield-admin dev",
+    "dev:mobile": "pnpm --filter mobile start",
+    "dev:api": "pnpm --filter api dev",
+    "build": "pnpm exec turbo run build"
+  },
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=10.33.0"
+  },
+  "devDependencies": {
+    "turbo": "latest",
+    "typescript": "^6.0.2"
+  }
+}
