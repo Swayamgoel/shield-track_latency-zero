@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
+  "scripts": {
+    "lint": "echo \"No lint configured for @repo/typescript-config\""
+  },
   "publishConfig": {
     "access": "public"
   }

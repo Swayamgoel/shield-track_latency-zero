@@ -1,0 +1,37 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "lint": "eslint \"src/**/*.ts\"",
+    "dev": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
+    "check-types": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:^",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^22.19.15",
+    "eslint": "^9.39.4",
+    "nodemon": "^3.1.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@shieldtrack/types": "workspace:*",
+    "@supabase/supabase-js": "^2.100.1",
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^16.0.3",
+    "express": "^5.2.1",
+    "firebase-admin": "^13.7.0",
+    "jsonwebtoken": "^9.0.3"
+  }
+}
