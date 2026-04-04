@@ -38,11 +38,11 @@ body {
 }
 
 /* ─── Bus marker smooth animation ─── */
-.leaflet-marker-pane>* {
+.maplibregl-marker {
   transition: transform 1.5s linear;
 }
 
-.leaflet-popup-pane>* {
+.maplibregl-popup {
   transition: transform 1.5s linear;
 }
 
@@ -72,8 +72,8 @@ body {
 .bus-marker {
   background: none !important;
   border: none !important;
-  pointer-events: none;
-  /* Let map handle drags when not on popup */
+  padding: 0;
+  cursor: pointer;
 }
 
 .bus-marker-inner {
@@ -197,9 +197,4 @@ body {
 
 .animate-pulse {
   animation: pulse 1.5s ease-in-out infinite;
-}
-
-/* ─── Map cursor when click mode is active ─── */
-.leaflet-container.crosshair-cursor {
-  cursor: crosshair !important;
 }
