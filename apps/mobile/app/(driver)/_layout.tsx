@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Redirect, Slot } from 'expo-router';
 
 import { loadSession } from '../../lib/session';
@@ -26,8 +26,8 @@ export default function DriverLayout() {
 
 	if (allowed === null) {
 		return (
-			<View style={styles.loading}>
-				<Text style={styles.loadingText}>Loading Driver Stack...</Text>
+			<View className="flex-1 items-center justify-center bg-background">
+				<Text className="text-primary text-base font-semibold">Loading Driver Stack...</Text>
 			</View>
 		);
 	}
@@ -38,17 +38,3 @@ export default function DriverLayout() {
 
 	return <Slot />;
 }
-
-const styles = StyleSheet.create({
-	loading: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		backgroundColor: '#0c0c0f',
-	},
-	loadingText: {
-		color: '#2574ff',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-});

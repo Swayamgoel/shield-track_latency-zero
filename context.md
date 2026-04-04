@@ -86,3 +86,88 @@ Key tables (all PKs are `uuid DEFAULT gen_random_uuid()`):
 | `SUPABASE_SERVICE_KEY` | API (Node), ML (Python) | Service role key — never expose publicly |
 | `SUPABASE_JWT_SECRET` | API (Node) | Signs parent session JWTs |
 | `GOOGLE_MAPS_API_KEY` | ML Backend | Optional; defaults to `mock` |
+
+---
+
+## Mobile App — Styling Rules (CRITICAL — READ BEFORE WRITING ANY UI)
+
+The mobile app uses **NativeWind v4** with the following `babel.config.js`:
+```js
+["babel-preset-expo", { jsxImportSource: "nativewind" }],
+"nativewind/babel",
+```
+
+`jsxImportSource: "nativewind"` means NativeWind **replaces the JSX factory for every element in every file**, including third-party components. This creates hard rules you must follow:
+
+### Rule 1 — NEVER mix `className` and `style` on `Animated.View` / `Animated.Text`
+
+**Why it crashes:** When `Animated.View` has both `className` and `style`, NativeWind's interop merges them. During the merge it processes the `style` array — which includes `Animated.Value` references (e.g. `transform: [{ scale: pulseAnim }]`). NativeWind converts the `Animated.Value` to a plain value and forwards it to the native Fabric component setter. Fabric receives a `String` type where it expects a Fabric-typed animated prop → **`java.lang.String cannot be cast to java.lang.Boolean`** crash at `setProperty → preallocateView`.
+
+**Fix:** On any `Animated.View` or `Animated.Text`, use **only** the `style` prop. No `className` allowed.
+
+```tsx
+// ✅ CORRECT — all styles in the style prop
+<Animated.View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: '#0d1a33', transform: [{ scale: pulseAnim }] }}>
+
+// ❌ WRONG — mixes className + style with Animated.Value
+<Animated.View className="w-[88px] h-[88px] rounded-full" style={{ transform: [{ scale: pulseAnim }] }}>
+```
+
+### Rule 2 — NEVER use 8-digit hex color values in any `style` prop
+
+**Why it crashes:** Android's native color parser (used by React Native Bridge and Fabric) does **not** support CSS-style 8-digit hex (`#RRGGBBAA`). It is iOS/CSS-only. Using it causes a type mismatch in the native `setProperty` setter.
+
+```tsx
+// ✅ CORRECT
+style={{ backgroundColor: 'rgba(21, 21, 26, 0.95)' }}
+style={{ backgroundColor: '#ff3b3033' }}  // NO — this is 8-digit hex
+
+// ❌ WRONG
+style={{ backgroundColor: '#15151af0' }}
+style={{ backgroundColor: `${color}22` }}  // string concat creates 8-digit hex
+
+// ✅ Use rgba() instead of hex+alpha
+style={{ backgroundColor: 'rgba(255, 59, 48, 0.2)' }}
+```
+
+### Rule 3 — NEVER pass `userInterfaceStyle` to `<MapView>` on Android
+
+`userInterfaceStyle` is an iOS-only prop. On Android, the native `MapView` prop setter receives a `String` and tries to cast it to `Boolean` → crash. Simply omit the prop.
+
+### Rule 4 — Parent layout must use `<Slot>` (not `<Tabs>`)
+
+During Phase 2D development, switching `(parent)/_layout.tsx` from `<Slot />` to Expo Router's `<Tabs>` component caused persistent crashes on Android with New Architecture. The exact native component incompatibility was not fully isolated, but the `<Tabs>` component from `@react-navigation/bottom-tabs` v7.x interacts adversely with the project's current React Native 0.81.5 + NativeWind v4 setup.
+
+**The established pattern for both driver and parent layouts is `<Slot>` with a session guard.** Tab-like navigation in the parent app is implemented via a custom `TabBar` component (plain `View` + `Pressable`) inside `tracker.tsx` with `activeTab` state.
+
+### Rule 5 — `isParentSession` must accept `bus_id: string | null`
+
+`ParentSession.bus_id` is typed as `string | null` — `null` is valid when the student has no active bus assignment yet. The validator must reflect this:
+```ts
+// ✅ CORRECT
+(typeof session.bus_id === 'string' || session.bus_id === null)
+
+// ❌ WRONG — rejects real sessions where bus hasn't started
+typeof session.bus_id === 'string'
+```
+
+---
+
+## Mobile App — Architecture Decisions
+
+### Parent App Navigation
+The parent's "Live Tracker" and "Alerts" tabs are **NOT** implemented as separate Expo Router screens with a tab navigator. Instead:
+- `(parent)/_layout.tsx` → `<Slot />` with session guard (same pattern as driver)
+- `(parent)/tracker.tsx` → Single screen that owns the full parent UI
+- `(parent)/NotificationsPanel.tsx` → Reusable component rendered inside `tracker.tsx` when the Alerts tab is active
+- `(parent)/notifications.tsx` → Simple `<Redirect href="/tracker" />` stub
+
+This avoids the React Navigation native tab bar while preserving the two-panel UX.
+
+### Styling in screens that use `react-native-maps` or `Animated`
+Use **plain inline `style` objects** (not `className`) for any component that is:
+1. An `Animated.*` component
+2. A `MapView` or `Marker` from `react-native-maps`
+3. Inside a component tree where prop types must be precisely controlled
+
+Use `className` freely on static `View`, `Text`, `Pressable` and `ScrollView` components.

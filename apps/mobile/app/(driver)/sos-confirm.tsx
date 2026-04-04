@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import {
 	ActivityIndicator,
 	Pressable,
-	StyleSheet,
 	Text,
 	View,
 } from 'react-native';
@@ -118,19 +117,19 @@ export default function SOSConfirmScreen() {
 	// ─── Render states ─────────────────────────────────────────────────────────
 	if (sosState === 'sent') {
 		return (
-			<View style={styles.root}>
-				<View style={styles.sentContainer}>
-					<Text style={styles.sentIcon}>✅</Text>
-					<Text style={styles.sentTitle}>SOS Sent</Text>
-					<Text style={styles.sentSub}>
+			<View className="flex-1 bg-[#0f0000] pt-[60px] px-6">
+				<View className="flex-1 items-center justify-center gap-3">
+					<Text className="text-[56px]">✅</Text>
+					<Text className="text-white text-2xl font-extrabold">SOS Sent</Text>
+					<Text className="text-[#aaa] text-sm text-center max-w-[260px] leading-5">
 						Emergency services and your admin have been alerted.
 					</Text>
 					{triggeredAt && (
-						<Text style={styles.sentTime}>
+						<Text className="text-[#666] text-[13px]">
 							{new Date(triggeredAt).toLocaleTimeString()}
 						</Text>
 					)}
-					<Text style={styles.sentRedirect}>Returning to trip screen...</Text>
+					<Text className="text-[#555] text-xs mt-2">Returning to trip screen...</Text>
 				</View>
 			</View>
 		);
@@ -138,16 +137,16 @@ export default function SOSConfirmScreen() {
 
 	if (sosState === 'error') {
 		return (
-			<View style={styles.root}>
-				<View style={styles.sentContainer}>
-					<Text style={styles.sentIcon}>❌</Text>
-					<Text style={styles.sentTitle}>SOS Failed</Text>
-					<Text style={styles.sentSub}>{errorMsg}</Text>
-					<Pressable style={styles.retryButton} onPress={() => setSosState('idle')}>
-						<Text style={styles.retryText}>Try Again</Text>
+			<View className="flex-1 bg-[#0f0000] pt-[60px] px-6">
+				<View className="flex-1 items-center justify-center gap-3">
+					<Text className="text-[56px]">❌</Text>
+					<Text className="text-white text-2xl font-extrabold">SOS Failed</Text>
+					<Text className="text-[#aaa] text-sm text-center max-w-[260px] leading-5">{errorMsg}</Text>
+					<Pressable className="bg-[#ff3b3b] rounded-xl px-7 py-3 mt-2" onPress={() => setSosState('idle')}>
+						<Text className="text-white font-bold">Try Again</Text>
 					</Pressable>
-					<Pressable style={styles.cancelLink} onPress={() => router.back()}>
-						<Text style={styles.cancelLinkText}>Back to Trip</Text>
+					<Pressable className="mt-1" onPress={() => router.back()}>
+						<Text className="text-[#666] text-[13px]">Back to Trip</Text>
 					</Pressable>
 				</View>
 			</View>
@@ -155,60 +154,57 @@ export default function SOSConfirmScreen() {
 	}
 
 	return (
-		<View style={styles.root}>
+		<View className="flex-1 bg-[#0f0000] pt-[60px] px-6">
 			{/* ── Warning Header ── */}
-			<View style={styles.header}>
-				<Text style={styles.headerIcon}>🚨</Text>
-				<Text style={styles.headerTitle}>SOS EMERGENCY</Text>
-				<Text style={styles.headerSub}>
+			<View className="items-center gap-2 mb-10">
+				<Text className="text-[52px]">🚨</Text>
+				<Text className="text-[#ff3b3b] text-[26px] font-extrabold tracking-widest">SOS EMERGENCY</Text>
+				<Text className="text-[#ffaaaa] text-sm text-center leading-5 max-w-[280px] opacity-80">
 					Send an emergency alert to the operations team and parents.
 				</Text>
 			</View>
 
 			{/* ── Countdown Circle ── */}
-			<View style={styles.countdownContainer}>
-				<View style={[
-					styles.countdownCircle,
-					sosState === 'countdown' && styles.countdownCircleActive,
-				]}>
+			<View className="items-center gap-4 flex-1">
+				<View className={`w-[120px] h-[120px] rounded-full border-[3px] items-center justify-center ${sosState === 'countdown' ? 'border-[#ff3b3b] bg-[#2a0000]' : 'bg-[#1a0000] border-[#ff3b3b44]'}`}>
 					{sosState === 'sending' ? (
 						<ActivityIndicator color="#ff3b3b" size="large" />
 					) : (
-						<Text style={styles.countdownNumber}>
+						<Text className="text-[#ff3b3b] text-[52px] font-extrabold">
 							{sosState === 'countdown' ? countdown : '!'}
 						</Text>
 					)}
 				</View>
 
 				{sosState === 'countdown' && (
-					<Text style={styles.countdownLabel}>
+					<Text className="text-[#ffaaaa] text-sm text-center max-w-[240px] leading-5">
 						SOS sending in {countdown} second{countdown !== 1 ? 's' : ''}...
 					</Text>
 				)}
 				{sosState === 'idle' && (
-					<Text style={styles.countdownLabel}>
+					<Text className="text-[#ffaaaa] text-sm text-center max-w-[240px] leading-5">
 						Press CONFIRM to start a {COUNTDOWN_SECONDS}-second SOS countdown
 					</Text>
 				)}
 				{sosState === 'sending' && (
-					<Text style={styles.countdownLabel}>Sending SOS alert...</Text>
+					<Text className="text-[#ffaaaa] text-sm text-center max-w-[240px] leading-5">Sending SOS alert...</Text>
 				)}
 			</View>
 
 			{/* ── Action Buttons ── */}
-			<View style={styles.actions}>
+			<View className="gap-3 pb-12">
 				{sosState === 'idle' && (
-					<Pressable style={styles.confirmButton} onPress={handleConfirm}>
-						<Text style={styles.confirmButtonText}>⚠️  CONFIRM SOS</Text>
+					<Pressable className="bg-[#ff3b3b] rounded-xl py-[18px] items-center" onPress={handleConfirm}>
+						<Text className="text-white text-[17px] font-extrabold tracking-wide">⚠️  CONFIRM SOS</Text>
 					</Pressable>
 				)}
 
 				<Pressable
-					style={[styles.cancelButton, sosState === 'sending' && styles.buttonDisabled]}
+					className={`bg-[#1a0000] rounded-xl py-3.5 items-center border border-[#ff3b3b44] ${sosState === 'sending' ? 'opacity-40' : ''}`}
 					onPress={handleCancel}
 					disabled={sosState === 'sending'}
 				>
-					<Text style={styles.cancelButtonText}>
+					<Text className="text-[#ff8888] text-[15px] font-semibold">
 						{sosState === 'countdown' ? '✕  CANCEL' : '← Back'}
 					</Text>
 				</Pressable>
@@ -216,143 +212,3 @@ export default function SOSConfirmScreen() {
 		</View>
 	);
 }
-
-const styles = StyleSheet.create({
-	root: {
-		flex: 1,
-		backgroundColor: '#0f0000',
-		paddingTop: 60,
-		paddingHorizontal: 24,
-	},
-	// ── Header ──
-	header: {
-		alignItems: 'center',
-		gap: 8,
-		marginBottom: 40,
-	},
-	headerIcon: {
-		fontSize: 52,
-	},
-	headerTitle: {
-		color: '#ff3b3b',
-		fontSize: 26,
-		fontWeight: '800',
-		letterSpacing: 1,
-	},
-	headerSub: {
-		color: '#ffaaaa',
-		fontSize: 14,
-		textAlign: 'center',
-		lineHeight: 20,
-		maxWidth: 280,
-		opacity: 0.8,
-	},
-	// ── Countdown ──
-	countdownContainer: {
-		alignItems: 'center',
-		gap: 16,
-		flex: 1,
-	},
-	countdownCircle: {
-		width: 120,
-		height: 120,
-		borderRadius: 60,
-		backgroundColor: '#1a0000',
-		borderWidth: 3,
-		borderColor: '#ff3b3b44',
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	countdownCircleActive: {
-		borderColor: '#ff3b3b',
-		backgroundColor: '#2a0000',
-	},
-	countdownNumber: {
-		color: '#ff3b3b',
-		fontSize: 52,
-		fontWeight: '800',
-	},
-	countdownLabel: {
-		color: '#ffaaaa',
-		fontSize: 14,
-		textAlign: 'center',
-		maxWidth: 240,
-		lineHeight: 20,
-	},
-	// ── Buttons ──
-	actions: {
-		gap: 12,
-		paddingBottom: 48,
-	},
-	confirmButton: {
-		backgroundColor: '#ff3b3b',
-		borderRadius: 14,
-		paddingVertical: 18,
-		alignItems: 'center',
-	},
-	confirmButtonText: {
-		color: '#ffffff',
-		fontSize: 17,
-		fontWeight: '800',
-		letterSpacing: 0.5,
-	},
-	cancelButton: {
-		backgroundColor: '#1a0000',
-		borderRadius: 14,
-		paddingVertical: 14,
-		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#ff3b3b44',
-	},
-	cancelButtonText: {
-		color: '#ff8888',
-		fontSize: 15,
-		fontWeight: '600',
-	},
-	buttonDisabled: { opacity: 0.4 },
-	// ── Sent / Error ──
-	sentContainer: {
-		flex: 1,
-		alignItems: 'center',
-		justifyContent: 'center',
-		gap: 12,
-	},
-	sentIcon: { fontSize: 56 },
-	sentTitle: {
-		color: '#ffffff',
-		fontSize: 24,
-		fontWeight: '800',
-	},
-	sentSub: {
-		color: '#aaa',
-		fontSize: 14,
-		textAlign: 'center',
-		maxWidth: 260,
-		lineHeight: 20,
-	},
-	sentTime: {
-		color: '#666',
-		fontSize: 13,
-	},
-	sentRedirect: {
-		color: '#555',
-		fontSize: 12,
-		marginTop: 8,
-	},
-	retryButton: {
-		backgroundColor: '#ff3b3b',
-		borderRadius: 10,
-		paddingHorizontal: 28,
-		paddingVertical: 12,
-		marginTop: 8,
-	},
-	retryText: {
-		color: '#fff',
-		fontWeight: '700',
-	},
-	cancelLink: { marginTop: 4 },
-	cancelLinkText: {
-		color: '#666',
-		fontSize: 13,
-	},
-});

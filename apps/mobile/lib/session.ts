@@ -27,7 +27,7 @@ const isParentSession = (value: unknown): value is ParentSession => {
     typeof session.user_id === 'string' &&
     typeof session.tenant_id === 'string' &&
     typeof session.student_id === 'string' &&
-    typeof session.bus_id === 'string' &&
+    (typeof session.bus_id === 'string' || session.bus_id === null) &&
     typeof session.access_token === 'string' &&
     typeof session.expires_at === 'string'
   );

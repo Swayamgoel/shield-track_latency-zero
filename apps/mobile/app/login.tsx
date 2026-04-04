@@ -4,7 +4,6 @@ import {
 	KeyboardAvoidingView,
 	Platform,
 	Pressable,
-	StyleSheet,
 	Text,
 	TextInput,
 	View,
@@ -72,28 +71,28 @@ export default function LoginScreen() {
 	return (
 		<KeyboardAvoidingView
 			{...(Platform.OS === 'ios' ? { behavior: 'padding' } : {})}
-			style={styles.container}
+			className="flex-1 justify-center p-6 bg-background"
 		>
-			<View style={styles.card}>
-				<View style={styles.toggleContainer}>
+			<View className="bg-card rounded-2xl p-6 gap-3">
+				<View className="flex-row bg-muted rounded-lg p-1 mb-2">
 					<Pressable
-						style={[styles.toggleButton, mode === 'driver' ? styles.toggleButtonActive : null]}
+						className={`flex-1 py-2 items-center rounded-md ${mode === 'driver' ? 'bg-primary' : ''}`}
 						onPress={() => { setMode('driver'); setError(null); }}
 					>
-						<Text style={[styles.toggleText, mode === 'driver' ? styles.toggleTextActive : null]}>Driver</Text>
+						<Text className={`font-semibold ${mode === 'driver' ? 'text-white' : 'text-[#888]'}`}>Driver</Text>
 					</Pressable>
 					<Pressable
-						style={[styles.toggleButton, mode === 'parent' ? styles.toggleButtonActive : null]}
+						className={`flex-1 py-2 items-center rounded-md ${mode === 'parent' ? 'bg-primary' : ''}`}
 						onPress={() => { setMode('parent'); setError(null); }}
 					>
-						<Text style={[styles.toggleText, mode === 'parent' ? styles.toggleTextActive : null]}>Parent</Text>
+						<Text className={`font-semibold ${mode === 'parent' ? 'text-white' : 'text-[#888]'}`}>Parent</Text>
 					</Pressable>
 				</View>
 
-				<Text style={[styles.title, styles.text]}>
+				<Text className="text-[28px] font-bold text-white">
 					{mode === 'driver' ? 'Driver Login' : 'Parent Login'}
 				</Text>
-				<Text style={[styles.subtitle, styles.text]}>
+				<Text className="opacity-80 mb-2 text-white">
 					{mode === 'driver' ? 'Sign in to start your route' : 'Track your student\'s bus'}
 				</Text>
 
@@ -107,7 +106,7 @@ export default function LoginScreen() {
 							keyboardType="email-address"
 							value={email}
 							onChangeText={setEmail}
-							style={styles.input}
+							className="bg-muted text-white rounded-xl px-[14px] py-3"
 							editable={!submitting}
 						/>
 						<TextInput
@@ -116,7 +115,7 @@ export default function LoginScreen() {
 							autoCapitalize="characters"
 							value={driverInstituteCode}
 							onChangeText={setDriverInstituteCode}
-							style={styles.input}
+							className="bg-muted text-white rounded-xl px-[14px] py-3"
 							editable={!submitting}
 						/>
 					</>
@@ -128,7 +127,7 @@ export default function LoginScreen() {
 							autoCapitalize="characters"
 							value={instituteCode}
 							onChangeText={setInstituteCode}
-							style={styles.input}
+							className="bg-muted text-white rounded-xl px-[14px] py-3"
 							editable={!submitting}
 						/>
 						<TextInput
@@ -137,108 +136,30 @@ export default function LoginScreen() {
 							autoCapitalize="characters"
 							value={registrationNo}
 							onChangeText={setRegistrationNo}
-							style={styles.input}
+							className="bg-muted text-white rounded-xl px-[14px] py-3"
 							editable={!submitting}
 						/>
 					</>
 				)}
 
-				{error ? <Text style={[styles.error, styles.text]}>{error}</Text> : null}
+				{error ? <Text className="text-error text-white">{error}</Text> : null}
 
 				<Pressable
-					style={[styles.button, (!canSubmit || submitting) ? styles.buttonDisabled : null]}
+					className={`bg-primary rounded-xl py-3 items-center mt-2 ${(!canSubmit || submitting) ? 'opacity-50' : ''}`}
 					onPress={handleLogin}
 					disabled={!!(!canSubmit || submitting)}
 				>
 					{submitting ? (
 						<ActivityIndicator color="#ffffff" />
 					) : (
-						<Text style={styles.buttonText}>Sign In</Text>
+						<Text className="text-white font-semibold">Sign In</Text>
 					)}
 				</Pressable>
 
-				<Text style={[styles.helper, styles.text]}>
+				<Text className="opacity-60 text-xs mt-2 text-white">
 					Tip: set EXPO_PUBLIC_USE_MOCKS=1 to test without backend.
 				</Text>
 			</View>
 		</KeyboardAvoidingView>
 	);
 }
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		justifyContent: 'center',
-		padding: 24,
-		backgroundColor: '#0c0c0f',
-	},
-	card: {
-		backgroundColor: '#15151a',
-		borderRadius: 16,
-		padding: 24,
-		gap: 12,
-	},
-	toggleContainer: {
-		flexDirection: 'row',
-		backgroundColor: '#1f1f26',
-		borderRadius: 8,
-		padding: 4,
-		marginBottom: 8,
-	},
-	toggleButton: {
-		flex: 1,
-		paddingVertical: 8,
-		alignItems: 'center',
-		borderRadius: 6,
-	},
-	toggleButtonActive: {
-		backgroundColor: '#2574ff',
-	},
-	toggleText: {
-		color: '#888',
-		fontWeight: '600',
-	},
-	toggleTextActive: {
-		color: '#ffffff',
-	},
-	title: {
-		fontSize: 28,
-		fontWeight: '700',
-	},
-	subtitle: {
-		opacity: 0.8,
-		marginBottom: 8,
-	},
-	text: {
-		color: '#ffffff',
-	},
-	input: {
-		backgroundColor: '#1f1f26',
-		borderRadius: 10,
-		paddingHorizontal: 14,
-		paddingVertical: 12,
-		color: '#ffffff',
-	},
-	error: {
-		color: '#ff6b6b',
-	},
-	button: {
-		backgroundColor: '#2574ff',
-		borderRadius: 10,
-		paddingVertical: 12,
-		alignItems: 'center',
-		marginTop: 8,
-	},
-	buttonDisabled: {
-		opacity: 0.5,
-	},
-	buttonText: {
-		color: '#ffffff',
-		fontWeight: '600',
-	},
-	helper: {
-		opacity: 0.6,
-		fontSize: 12,
-		marginTop: 8,
-	},
-});
