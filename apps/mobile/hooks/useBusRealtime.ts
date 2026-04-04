@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { BusLocation, DeviationAlert, SOSEvent } from '@shieldtrack/types';
+import { upsertAlert } from '../lib/alertsCache';
 import { supabase } from '../lib/supabase';
 
 const SPEED_HISTORY_SIZE = 5;
@@ -79,6 +80,30 @@ export function useBusRealtime({
   useEffect(() => {
     if (!busId) return;
 
+    const seedLatestLocation = async () => {
+      const { data, error } = await supabase
+        .from('bus_locations')
+        .select('lat, lng, speed_kmh, recorded_at')
+        .eq('bus_id', busId)
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error || !data) return;
+
+      speedHistory.current = [data.speed_kmh];
+      setLocation({
+        lat: data.lat,
+        lng: data.lng,
+        speed_kmh: data.speed_kmh,
+        recorded_at: data.recorded_at,
+      });
+      setBusOnline(true);
+      setEta(computeETA(data.speed_kmh, distanceMetres));
+    };
+
+    void seedLatestLocation();
+
     const channelName = `parent-bus-${busId}`;
 
     const channel = supabase
@@ -123,7 +148,9 @@ export function useBusRealtime({
           filter: `bus_id=eq.${busId}`,
         },
         (payload) => {
-          setSosEvent(payload.new as SOSEvent);
+          const event = payload.new as SOSEvent;
+          setSosEvent(event);
+          upsertAlert({ kind: 'sos', data: event });
         },
       )
       // ── deviation_alerts INSERT → surface deviation alert ─────────────────
@@ -136,7 +163,9 @@ export function useBusRealtime({
           filter: `bus_id=eq.${busId}`,
         },
         (payload) => {
-          setDeviationAlert(payload.new as DeviationAlert);
+          const event = payload.new as DeviationAlert;
+          setDeviationAlert(event);
+          upsertAlert({ kind: 'deviation', data: event });
         },
       )
       .subscribe((status) => {

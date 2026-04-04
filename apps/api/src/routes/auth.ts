@@ -28,7 +28,7 @@ router.post('/login', async (req, res) => {
 		// 2. Verify Student ID belongs to that Tenant
 		const { data: student, error: studentError } = await supabaseAdmin
 			.from('students')
-			.select('id, name, registration_no')
+			.select('id, name, registration_no, route_id')
 			.eq('registration_no', payload.registration_no)
 			.eq('tenant_id', tenant.id)
 			.single();
@@ -37,8 +37,39 @@ router.post('/login', async (req, res) => {
 			return res.status(401).json({ error: { message: 'Invalid Registration Number for this Institute' } });
 		}
 
-		// 3. TODO Phase 2: query trip_assignments for student's route to resolve real bus_id
-		const resolvedBusId: string | null = null;
+		// 3. Resolve the student's current bus from active trip first, then today's assignment.
+		let resolvedBusId: string | null = null;
+
+		if (student.route_id) {
+			const { data: activeTrip } = await supabaseAdmin
+				.from('trips')
+				.select('bus_id, started_at')
+				.eq('tenant_id', tenant.id)
+				.eq('route_id', student.route_id)
+				.eq('status', 'active')
+				.order('started_at', { ascending: false })
+				.limit(1)
+				.maybeSingle();
+
+			if (activeTrip?.bus_id) {
+				resolvedBusId = activeTrip.bus_id as string;
+			} else {
+				const today = new Date().toISOString().slice(0, 10);
+				const { data: assignment } = await supabaseAdmin
+					.from('trip_assignments')
+					.select('bus_id, assigned_date, created_at')
+					.eq('tenant_id', tenant.id)
+					.eq('route_id', student.route_id)
+					.eq('assigned_date', today)
+					.order('created_at', { ascending: false })
+					.limit(1)
+					.maybeSingle();
+
+				if (assignment?.bus_id) {
+					resolvedBusId = assignment.bus_id as string;
+				}
+			}
+		}
 
 		// 4. Generate a JWT representing the Parent session
 		const tokenPayload = {
