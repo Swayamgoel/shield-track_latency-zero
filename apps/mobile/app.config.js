@@ -16,8 +16,9 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 
 module.exports = {
   expo: {
-    name: 'mobile',
-    slug: 'mobile',
+    name: 'ShieldTrack',
+    slug: 'shieldtrack',
+    scheme: 'shieldtrack',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',

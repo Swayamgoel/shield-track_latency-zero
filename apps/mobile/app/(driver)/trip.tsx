@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
 	ActivityIndicator,
 	Alert,
 	Pressable,
 	RefreshControl,
 	ScrollView,
-	StyleSheet,
 	Text,
 	View,
 } from 'react-native';
@@ -161,21 +160,21 @@ export default function DriverTripScreen() {
 	const renderContent = () => {
 		if (screenStatus === 'loading') {
 			return (
-				<View style={styles.centeredState}>
+				<View className="items-center justify-center py-[60px] gap-3">
 					<ActivityIndicator color="#2574ff" size="large" />
-					<Text style={styles.stateText}>Loading assignment...</Text>
+					<Text className="text-[#888] text-sm text-center leading-5 max-w-[280px]">Loading assignment...</Text>
 				</View>
 			);
 		}
 
 		if (screenStatus === 'error') {
 			return (
-				<View style={styles.centeredState}>
-					<Text style={styles.errorEmoji}>⚠️</Text>
-					<Text style={styles.stateTitle}>Could not load assignment</Text>
-					<Text style={styles.stateText}>{errorMsg}</Text>
-					<Pressable style={styles.retryButton} onPress={loadAssignment}>
-						<Text style={styles.retryButtonText}>Retry</Text>
+				<View className="items-center justify-center py-[60px] gap-3">
+					<Text className="text-5xl">⚠️</Text>
+					<Text className="text-white text-xl font-bold text-center">Could not load assignment</Text>
+					<Text className="text-[#888] text-sm text-center leading-5 max-w-[280px]">{errorMsg}</Text>
+					<Pressable className="mt-2 bg-primary px-6 py-2.5 rounded-xl" onPress={loadAssignment}>
+						<Text className="text-white font-semibold">Retry</Text>
 					</Pressable>
 				</View>
 			);
@@ -183,10 +182,10 @@ export default function DriverTripScreen() {
 
 		if (screenStatus === 'no_assignment') {
 			return (
-				<View style={styles.centeredState}>
-					<Text style={styles.errorEmoji}>📋</Text>
-					<Text style={styles.stateTitle}>No Assignment Today</Text>
-					<Text style={styles.stateText}>
+				<View className="items-center justify-center py-[60px] gap-3">
+					<Text className="text-5xl">📋</Text>
+					<Text className="text-white text-xl font-bold text-center">No Assignment Today</Text>
+					<Text className="text-[#888] text-sm text-center leading-5 max-w-[280px]">
 						You have no trip assigned for today. Check back later or contact your admin.
 					</Text>
 				</View>
@@ -198,34 +197,34 @@ export default function DriverTripScreen() {
 		return (
 			<>
 				{/* ── Assignment Card ── */}
-				<View style={styles.card}>
-					<Text style={styles.cardLabel}>Today's Assignment</Text>
+				<View className="bg-card rounded-2xl p-5 gap-3.5">
+					<Text className="text-[#888] text-xs font-semibold uppercase tracking-widest">Today's Assignment</Text>
 
-					<View style={styles.cardRow}>
-						<Text style={styles.cardIcon}>🚌</Text>
+					<View className="flex-row items-center gap-3">
+						<Text className="text-[28px]">🚌</Text>
 						<View>
-							<Text style={styles.cardValueLarge}>{assignment.bus_plate}</Text>
-							<Text style={styles.cardValueSmall}>Bus Plate</Text>
+							<Text className="text-white text-lg font-bold">{assignment.bus_plate}</Text>
+							<Text className="text-[#888] text-xs mt-0.5">Bus Plate</Text>
 						</View>
 					</View>
 
-					<View style={styles.divider} />
+					<View className="h-[1px] bg-[#1f1f26]" />
 
-					<View style={styles.cardRow}>
-						<Text style={styles.cardIcon}>🗺️</Text>
+					<View className="flex-row items-center gap-3">
+						<Text className="text-[28px]">🗺️</Text>
 						<View>
-							<Text style={styles.cardValueLarge}>{assignment.route_name}</Text>
-							<Text style={styles.cardValueSmall}>Route</Text>
+							<Text className="text-white text-lg font-bold">{assignment.route_name}</Text>
+							<Text className="text-[#888] text-xs mt-0.5">Route</Text>
 						</View>
 					</View>
 
-					<View style={styles.divider} />
+					<View className="h-[1px] bg-[#1f1f26]" />
 
-					<View style={styles.statusRow}>
-						<Text style={styles.cardValueSmall}>Status</Text>
-						<View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[screenStatus] + '22' }]}>
-							<View style={[styles.statusDot, { backgroundColor: STATUS_COLORS[screenStatus] }]} />
-							<Text style={[styles.statusText, { color: STATUS_COLORS[screenStatus] }]}>
+					<View className="flex-row justify-between items-center">
+						<Text className="text-[#888] text-xs mt-0.5">Status</Text>
+						<View className="flex-row items-center gap-1.5 px-2.5 py-1 rounded-full" style={{ backgroundColor: STATUS_COLORS[screenStatus] + '22' }}>
+							<View className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[screenStatus] }} />
+							<Text className="text-[13px] font-semibold" style={{ color: STATUS_COLORS[screenStatus] }}>
 								{screenStatus === 'in_progress' ? 'In Progress' : screenStatus.charAt(0).toUpperCase() + screenStatus.slice(1)}
 							</Text>
 						</View>
@@ -234,22 +233,22 @@ export default function DriverTripScreen() {
 
 				{/* ── GPS Broadcast Indicator ── */}
 				{broadcasting && (
-					<View style={styles.broadcastBanner}>
-						<View style={styles.broadcastDot} />
-						<Text style={styles.broadcastText}>Broadcasting GPS to parents</Text>
+					<View className="flex-row items-center gap-2 bg-[#0d2a0d] rounded-xl p-3 border border-[#22c55e33]">
+						<View className="w-2 h-2 rounded-full bg-[#22c55e]" />
+						<Text className="text-[#22c55e] text-[13px] font-semibold">Broadcasting GPS to parents</Text>
 					</View>
 				)}
 
 				{/* ── Action Buttons ── */}
 				{screenStatus === 'assigned' && (
 					<Pressable
-						style={[styles.primaryButton, actionLoading && styles.buttonDisabled]}
+						className={`bg-primary rounded-xl py-4 items-center ${actionLoading ? 'opacity-50' : ''}`}
 						onPress={handleStartTrip}
 						disabled={actionLoading}
 					>
 						{actionLoading
 							? <ActivityIndicator color="#fff" />
-							: <Text style={styles.primaryButtonText}>▶  Start Trip</Text>
+							: <Text className="text-white text-base font-bold">▶  Start Trip</Text>
 						}
 					</Pressable>
 				)}
@@ -257,27 +256,27 @@ export default function DriverTripScreen() {
 				{screenStatus === 'in_progress' && (
 					<>
 						<Pressable
-							style={[styles.endButton, actionLoading && styles.buttonDisabled]}
+							className={`bg-[#1f1f26] rounded-xl py-4 items-center border border-[#2f2f38] ${actionLoading ? 'opacity-50' : ''}`}
 							onPress={handleEndTrip}
 							disabled={actionLoading}
 						>
 							{actionLoading
 								? <ActivityIndicator color="#fff" />
-								: <Text style={styles.primaryButtonText}>⏹  End Trip</Text>
+								: <Text className="text-white text-base font-bold">⏹  End Trip</Text>
 							}
 						</Pressable>
 
-						<Pressable style={styles.sosButton} onPress={handleSOS}>
-							<Text style={styles.sosButtonText}>⚠️  SOS EMERGENCY</Text>
+						<Pressable className="bg-[#1a0000] rounded-xl py-[18px] items-center border-2 border-[#ff3b3b]" onPress={handleSOS}>
+							<Text className="text-[#ff3b3b] text-base font-bold tracking-wide">⚠️  SOS EMERGENCY</Text>
 						</Pressable>
 					</>
 				)}
 
 				{screenStatus === 'completed' && (
-					<View style={styles.completedCard}>
-						<Text style={styles.completedEmoji}>✅</Text>
-						<Text style={styles.completedText}>Trip Completed</Text>
-						<Text style={styles.completedSub}>Great work! Your trip has been recorded.</Text>
+					<View className="bg-[#0d1a0d] rounded-2xl p-7 items-center gap-2.5 border border-[#22c55e33]">
+						<Text className="text-[40px]">✅</Text>
+						<Text className="text-[#22c55e] text-xl font-bold">Trip Completed</Text>
+						<Text className="text-[#888] text-sm text-center">Great work! Your trip has been recorded.</Text>
 					</View>
 				)}
 			</>
@@ -285,18 +284,18 @@ export default function DriverTripScreen() {
 	};
 
 	return (
-		<View style={styles.root}>
+		<View className="flex-1 bg-background">
 			{/* ── Header ── */}
-			<View style={styles.header}>
-				<Text style={styles.headerTitle}>ShieldTrack</Text>
-				<Pressable style={styles.logoutButton} onPress={handleLogout}>
-					<Text style={styles.logoutText}>Logout</Text>
+			<View className="flex-row justify-between items-center px-5 pt-14 pb-4 bg-background border-b border-[#1f1f26]">
+				<Text className="text-primary text-xl font-bold">ShieldTrack</Text>
+				<Pressable className="px-3.5 py-1.5 rounded-lg border border-[#2f2f38]" onPress={handleLogout}>
+					<Text className="text-[#888] text-[13px] font-semibold">Logout</Text>
 				</Pressable>
 			</View>
 
 			<ScrollView
-				style={styles.scroll}
-				contentContainerStyle={styles.scrollContent}
+				className="flex-1"
+				contentContainerClassName="p-5 pb-10 gap-4"
 				refreshControl={
 					<RefreshControl
 						refreshing={refreshing}
@@ -310,210 +309,3 @@ export default function DriverTripScreen() {
 		</View>
 	);
 }
-
-const styles = StyleSheet.create({
-	root: {
-		flex: 1,
-		backgroundColor: '#0c0c0f',
-	},
-	header: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-		paddingHorizontal: 20,
-		paddingTop: 56,
-		paddingBottom: 16,
-		backgroundColor: '#0c0c0f',
-		borderBottomWidth: 1,
-		borderBottomColor: '#1f1f26',
-	},
-	headerTitle: {
-		color: '#2574ff',
-		fontSize: 20,
-		fontWeight: '700',
-	},
-	logoutButton: {
-		paddingHorizontal: 14,
-		paddingVertical: 6,
-		borderRadius: 8,
-		borderWidth: 1,
-		borderColor: '#2f2f38',
-	},
-	logoutText: {
-		color: '#888',
-		fontSize: 13,
-		fontWeight: '600',
-	},
-	scroll: { flex: 1 },
-	scrollContent: {
-		padding: 20,
-		paddingBottom: 40,
-		gap: 16,
-	},
-	// ── States ──
-	centeredState: {
-		alignItems: 'center',
-		justifyContent: 'center',
-		paddingVertical: 60,
-		gap: 12,
-	},
-	errorEmoji: { fontSize: 48 },
-	stateTitle: {
-		color: '#ffffff',
-		fontSize: 20,
-		fontWeight: '700',
-		textAlign: 'center',
-	},
-	stateText: {
-		color: '#888',
-		fontSize: 14,
-		textAlign: 'center',
-		lineHeight: 20,
-		maxWidth: 280,
-	},
-	retryButton: {
-		marginTop: 8,
-		backgroundColor: '#2574ff',
-		paddingHorizontal: 24,
-		paddingVertical: 10,
-		borderRadius: 10,
-	},
-	retryButtonText: {
-		color: '#fff',
-		fontWeight: '600',
-	},
-	// ── Assignment Card ──
-	card: {
-		backgroundColor: '#15151a',
-		borderRadius: 16,
-		padding: 20,
-		gap: 14,
-	},
-	cardLabel: {
-		color: '#888',
-		fontSize: 12,
-		fontWeight: '600',
-		textTransform: 'uppercase',
-		letterSpacing: 1,
-	},
-	cardRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 12,
-	},
-	cardIcon: { fontSize: 28 },
-	cardValueLarge: {
-		color: '#ffffff',
-		fontSize: 18,
-		fontWeight: '700',
-	},
-	cardValueSmall: {
-		color: '#888',
-		fontSize: 12,
-		marginTop: 2,
-	},
-	divider: {
-		height: 1,
-		backgroundColor: '#1f1f26',
-	},
-	statusRow: {
-		flexDirection: 'row',
-		justifyContent: 'space-between',
-		alignItems: 'center',
-	},
-	statusBadge: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 6,
-		paddingHorizontal: 10,
-		paddingVertical: 4,
-		borderRadius: 20,
-	},
-	statusDot: {
-		width: 6,
-		height: 6,
-		borderRadius: 3,
-	},
-	statusText: {
-		fontSize: 13,
-		fontWeight: '600',
-	},
-	// ── GPS Banner ──
-	broadcastBanner: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		gap: 8,
-		backgroundColor: '#0d2a0d',
-		borderRadius: 10,
-		padding: 12,
-		borderWidth: 1,
-		borderColor: '#22c55e33',
-	},
-	broadcastDot: {
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-		backgroundColor: '#22c55e',
-	},
-	broadcastText: {
-		color: '#22c55e',
-		fontSize: 13,
-		fontWeight: '600',
-	},
-	// ── Buttons ──
-	primaryButton: {
-		backgroundColor: '#2574ff',
-		borderRadius: 14,
-		paddingVertical: 16,
-		alignItems: 'center',
-	},
-	endButton: {
-		backgroundColor: '#1f1f26',
-		borderRadius: 14,
-		paddingVertical: 16,
-		alignItems: 'center',
-		borderWidth: 1,
-		borderColor: '#2f2f38',
-	},
-	primaryButtonText: {
-		color: '#ffffff',
-		fontSize: 16,
-		fontWeight: '700',
-	},
-	buttonDisabled: { opacity: 0.5 },
-	sosButton: {
-		backgroundColor: '#1a0000',
-		borderRadius: 14,
-		paddingVertical: 18,
-		alignItems: 'center',
-		borderWidth: 2,
-		borderColor: '#ff3b3b',
-	},
-	sosButtonText: {
-		color: '#ff3b3b',
-		fontSize: 16,
-		fontWeight: '800',
-		letterSpacing: 0.5,
-	},
-	// ── Completed ──
-	completedCard: {
-		backgroundColor: '#0d1a0d',
-		borderRadius: 16,
-		padding: 28,
-		alignItems: 'center',
-		gap: 10,
-		borderWidth: 1,
-		borderColor: '#22c55e33',
-	},
-	completedEmoji: { fontSize: 40 },
-	completedText: {
-		color: '#22c55e',
-		fontSize: 20,
-		fontWeight: '700',
-	},
-	completedSub: {
-		color: '#888',
-		fontSize: 14,
-		textAlign: 'center',
-	},
-});

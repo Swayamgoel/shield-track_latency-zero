@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Redirect } from 'expo-router';
 
 import { loadSession } from '../lib/session';
@@ -23,8 +23,8 @@ export default function IndexScreen() {
 
 	if (loading) {
 		return (
-			<View style={styles.container}>
-				<Text style={styles.text}>Booting ShieldTrack...</Text>
+			<View className="flex-1 items-center justify-center bg-background">
+				<Text className="text-primary text-base font-semibold">Booting ShieldTrack...</Text>
 			</View>
 		);
 	}
@@ -37,17 +37,3 @@ export default function IndexScreen() {
 		return <Redirect href="/login" />;
 	}
 }
-
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		justifyContent: 'center',
-		alignItems: 'center',
-		backgroundColor: '#0c0c0f',
-	},
-	text: {
-		color: '#2574ff',
-		fontSize: 16,
-		fontWeight: '600',
-	},
-});
