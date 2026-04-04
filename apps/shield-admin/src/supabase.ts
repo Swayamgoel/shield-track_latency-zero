@@ -7,7 +7,7 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error(
     "Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY environment variables. " +
-    "Please check your .env file."
+      "Please check your .env file.",
   );
 }
 
@@ -43,6 +43,7 @@ export interface RouteStop {
   name: string;
   lat: number;
   lng: number;
+  order: number;
   arrival_time?: string;
 }
 
@@ -71,6 +72,8 @@ export interface Bus {
   tenant_id: string; // uuid
   plate_number: string; // unique per tenant (case-insensitive)
   capacity: number;
+  driver_id: string | null; // uuid
+  default_route_id: string | null; // uuid
   created_at: string;
 }
 
@@ -88,9 +91,19 @@ export interface Student {
   tenant_id: string; // uuid
   name: string;
   route_id: string | null; // uuid
-  registration_no: string; // human-readable ID shared with parents for login
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  registration_no: string;
   created_at: string;
 }
+
+/**
+ * A driver is a User with role = 'driver'.
+ */
+export type Driver = Pick<User, "id" | "tenant_id" | "email" | "created_at"> & {
+  role: "driver";
+};
 
 export interface BusLocation {
   id: string; // uuid
@@ -106,7 +119,7 @@ export interface BusLocation {
 export interface Trip {
   id: string; // uuid
   tenant_id: string; // uuid
-  assignment_id: string; // uuid
+  assignment_id: string | null; // uuid
   bus_id: string; // uuid
   route_id: string; // uuid
   driver_id: string; // uuid

@@ -1,25 +1,30 @@
-import { useState, useEffect, useCallback, FormEvent } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import L, { LatLngExpression } from "leaflet";
+import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { PiCaretRightBold } from "react-icons/pi";
+
 import { supabase } from "../supabase";
-import type { Bus, Route, BusLocation } from "../supabase";
+import type { RouteOption, RouteStop } from "../supabase";
 
-const busIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/512/3448/3448339.png",
-  iconSize: [40, 40],
-  iconAnchor: [20, 40],
-  popupAnchor: [0, -40],
-});
+import DashboardMap from "./dashboard/DashboardMap";
+import DashboardSidebar, {
+  type DashboardTabId,
+} from "./dashboard/DashboardSidebar";
+import LiveInsightsPanel, {
+  type ApprovedReroute,
+} from "./dashboard/LiveInsightsPanel";
+import MapLegend from "./dashboard/MapLegend";
+import {
+  APPROVED_REROUTES_STORAGE_KEY,
+  extractRouteDestination,
+  formatTime,
+  getConfidenceMeta,
+  getSavedMapView,
+  loadApprovedReroutes,
+  toNumber,
+} from "./dashboard/dashboard-utils";
+import useDashboardRealtimeData from "./dashboard/useDashboardRealtimeData";
 
-function FollowBus({ center }: { center: LatLngExpression | null }) {
-  const map = useMap();
-  useEffect(() => {
-    if (center) {
-      map.flyTo(center, map.getZoom(), { animate: true, duration: 1.5 });
-    }
-  }, [center, map]);
-  return null;
-}
+const ML_API_BASE_URL =
+  import.meta.env.VITE_ML_API_BASE_URL?.trim() || "http://localhost:8000";
 
 interface MainDashboardProps {
   tenantId: string;
@@ -30,304 +35,498 @@ export default function MainDashboard({
   tenantId,
   instituteCode,
 }: MainDashboardProps) {
-  const [buses, setBuses] = useState<Record<string, BusLocation>>({});
-  const [fleetList, setFleetList] = useState<Bus[]>([]);
-  const [routeList, setRouteList] = useState<Route[]>([]);
+  const [activeTab, setActiveTab] = useState<DashboardTabId>("routes");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [mapFocus, setMapFocus] = useState<[number, number] | null>(null);
+  const [followLiveTracking, setFollowLiveTracking] = useState(false);
 
-  // Forms State
-  const [newPlateNumber, setNewPlateNumber] = useState("");
-  const [newBusCapacity, setNewBusCapacity] = useState("40");
-  const [newStudentName, setNewStudentName] = useState("");
-  const [assignRouteId, setAssignRouteId] = useState("");
+  const [selectedInsightBusId, setSelectedInsightBusId] = useState("");
+  const [approvedReroutes, setApprovedReroutes] = useState<ApprovedReroute[]>(
+    [],
+  );
+  const [approvedReroutesTenantReady, setApprovedReroutesTenantReady] =
+    useState<string | null>(null);
 
-  const DEFAULT_CAPACITY = 40;
-  const MIN_CAPACITY = 10;
-  const MAX_CAPACITY = 100;
+  const [auditOptions, setAuditOptions] = useState<RouteOption[]>([]);
+  const [selectedAuditRouteId, setSelectedAuditRouteId] = useState("");
+  const [auditUpdatedAt, setAuditUpdatedAt] = useState<string | null>(null);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
 
-  // --- 1. REGISTER A NEW BUS ---
-  const handleRegisterBus = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!newPlateNumber.trim()) return;
+  const [builderStops, setBuilderStops] = useState<RouteStop[]>([]);
+  const [builderPolyline, setBuilderPolyline] = useState<[number, number][]>(
+    [],
+  );
+  const [placementPreview, setPlacementPreview] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [mapClickHandler, setMapClickHandler] = useState<
+    ((lat: number, lng: number, address: string) => void) | null
+  >(null);
 
-    const plate = newPlateNumber.trim().toUpperCase();
+  const {
+    buses,
+    fleetList,
+    allStudents,
+    routesCatalog,
+    etaByBus,
+    routeSuggestionsByBus,
+    setRouteSuggestionsByBus,
+    fetchFleet,
+    fetchStudents,
+    fetchRoutes,
+    fetchLatestInsights,
+  } = useDashboardRealtimeData({ tenantId });
 
-    // Harden capacity parsing
-    let capacity = parseInt(newBusCapacity, 10);
-    if (isNaN(capacity)) {
-      capacity = DEFAULT_CAPACITY;
-    }
-    // Clamp to [MIN, MAX]
-    capacity = Math.max(MIN_CAPACITY, Math.min(MAX_CAPACITY, capacity));
-
-    const { error } = await supabase
-      .from("buses")
-      .insert({ plate_number: plate, tenant_id: tenantId, capacity });
-
-    if (error) alert("Error: This Plate Number might already exist!");
-    else {
-      alert(`✅ Bus ${plate} registered successfully!`);
-      setNewPlateNumber("");
-      fetchOfficialFleet();
-    }
-  };
-
-  // --- 2. REGISTER A STUDENT TO A ROUTE ---
-  const handleRegisterStudent = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!newStudentName.trim() || !assignRouteId) {
-      return alert("Please enter a Student Name and select a route!");
-    }
-
-    const formattedStudent = newStudentName.trim();
-
-    const { error } = await supabase.from("students").insert({
-      name: formattedStudent,
-      tenant_id: tenantId,
-      route_id: assignRouteId,
-    });
-
-    if (error) alert("Error registering student!");
-    else {
-      alert(`✅ Student ${formattedStudent} assigned correctly!`);
-      setNewStudentName("");
-    }
-  };
-
-  const fetchOfficialFleet = useCallback(async () => {
-    const { data } = await supabase
-      .from("buses")
-      .select("*")
-      .eq("tenant_id", tenantId);
-    if (data) setFleetList(data);
-  }, [tenantId]);
-
-  const fetchRoutes = useCallback(async () => {
-    const { data } = await supabase
-      .from("routes")
-      .select("*")
-      .eq("tenant_id", tenantId);
-    if (data) setRouteList(data);
-  }, [tenantId]);
+  const mapClickActive = mapClickHandler !== null;
+  const approvedReroutesStorageKey = `${APPROVED_REROUTES_STORAGE_KEY}:${tenantId}`;
 
   useEffect(() => {
-    fetchOfficialFleet();
-    fetchRoutes();
+    setApprovedReroutes(loadApprovedReroutes(approvedReroutesStorageKey));
+    setApprovedReroutesTenantReady(tenantId);
+  }, [approvedReroutesStorageKey, tenantId]);
 
-    const loadInitialData = async () => {
-      // Optimized: Using a database view to get only the latest ping per bus
-      const { data } = await supabase
-        .from("latest_bus_locations")
-        .select("*")
-        .eq("tenant_id", tenantId);
+  useEffect(() => {
+    if (approvedReroutesTenantReady !== tenantId) return;
 
-      if (data) {
-        const initialMap: Record<string, BusLocation> = {};
-        // With the view, we already have one latest record per bus_id
-        data.forEach((b: BusLocation) => {
-          initialMap[b.bus_id] = b;
-        });
-        setBuses(initialMap);
-      }
-    };
-    loadInitialData();
+    localStorage.setItem(
+      approvedReroutesStorageKey,
+      JSON.stringify(approvedReroutes.slice(0, 30)),
+    );
+  }, [
+    approvedReroutes,
+    approvedReroutesStorageKey,
+    approvedReroutesTenantReady,
+    tenantId,
+  ]);
 
-    const subscription = supabase
-      .channel("fleet-updates")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "bus_locations",
-          filter: `tenant_id=eq.${tenantId}`,
-        },
-        (payload) => {
-          // FIX: Handle DELETE events safely
-          if (payload.eventType === "DELETE") {
-            const oldId = (payload.old as { id: string }).id;
-            setBuses((prev) => {
-              // Only remove the bus if the record being deleted was actually the one we have in state
-              const busIdKey = Object.keys(prev).find(
-                (key) => prev[key].id === oldId,
-              );
-              if (busIdKey) {
-                const copy = { ...prev };
-                delete copy[busIdKey];
-                return copy;
-              }
-              return prev;
-            });
-          } else {
-            const newLoc = payload.new as BusLocation;
-            if (newLoc.bus_id) {
-              setBuses((prev) => ({ ...prev, [newLoc.bus_id]: newLoc }));
-            }
-          }
-        },
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [fetchOfficialFleet, fetchRoutes, tenantId]);
+  useEffect(() => {
+    if (activeTab === "students" || activeTab === "routes") {
+      fetchStudents();
+    }
+    if (activeTab === "fleet") {
+      fetchFleet();
+      fetchRoutes();
+    }
+  }, [activeTab, fetchFleet, fetchRoutes, fetchStudents]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
 
+  const handleRequestMapClick = useCallback(
+    (callback: (lat: number, lng: number, address: string) => void) => {
+      setPlacementPreview(null);
+      setMapClickHandler(() => (lat: number, lng: number, address: string) => {
+        setPlacementPreview({ lat, lng });
+        callback(lat, lng, address);
+        setMapClickHandler(null);
+      });
+    },
+    [],
+  );
+
+  const handleCancelMapClick = useCallback(() => {
+    setMapClickHandler(null);
+    setPlacementPreview(null);
+  }, []);
+
   const activeBuses = Object.values(buses);
-  const activeBusPos: LatLngExpression =
-    activeBuses.length > 0
+  const activeBusIds = Object.keys(buses);
+  const activeBusIdsKey = activeBusIds.join("|");
+
+  useEffect(() => {
+    fetchLatestInsights(activeBusIds);
+  }, [activeBusIdsKey, fetchLatestInsights]);
+
+  useEffect(() => {
+    if (activeBusIds.length === 0) {
+      setSelectedInsightBusId("");
+      return;
+    }
+    if (!selectedInsightBusId || !activeBusIds.includes(selectedInsightBusId)) {
+      setSelectedInsightBusId(activeBusIds[0]);
+    }
+  }, [activeBusIdsKey, selectedInsightBusId]);
+
+  const selectedBusId = selectedInsightBusId;
+  const selectedBusIdRef = useRef("");
+  const auditRequestSeqRef = useRef(0);
+
+  useEffect(() => {
+    selectedBusIdRef.current = selectedBusId;
+  }, [selectedBusId]);
+
+  const selectedBusDetails = fleetList.find((bus) => bus.id === selectedBusId);
+  const selectedBusLocation = selectedBusId ? buses[selectedBusId] : undefined;
+  const selectedEta = selectedBusId ? etaByBus[selectedBusId] : undefined;
+  const selectedRecommendation = selectedBusId
+    ? routeSuggestionsByBus[selectedBusId]
+    : undefined;
+
+  const selectedRouteOptions = useMemo(() => {
+    return Array.isArray(selectedRecommendation?.routes_json)
+      ? (selectedRecommendation.routes_json as RouteOption[])
+      : [];
+  }, [selectedRecommendation?.routes_json]);
+
+  const recommendedRoute =
+    selectedRouteOptions.find((option) => option.is_recommended) ??
+    selectedRouteOptions[0];
+
+  useEffect(() => {
+    if (selectedRouteOptions.length === 0) {
+      setAuditOptions([]);
+      setSelectedAuditRouteId("");
+      setAuditUpdatedAt(null);
+      return;
+    }
+
+    setAuditOptions(selectedRouteOptions.slice(0, 3));
+    setSelectedAuditRouteId(
+      selectedRouteOptions.find((option) => option.is_recommended)?.route_id ||
+        selectedRouteOptions[0].route_id,
+    );
+    setAuditUpdatedAt(selectedRecommendation?.recommended_at ?? null);
+  }, [selectedRecommendation?.recommended_at, selectedRouteOptions]);
+
+  const persistApprovedRouteChoice = useCallback(
+    async (busId: string, selectedRouteId: string, routes: RouteOption[]) => {
+      const normalizedRoutes = routes.map((route) => ({
+        ...route,
+        is_recommended: route.route_id === selectedRouteId,
+        notes:
+          route.route_id === selectedRouteId
+            ? `${route.notes || ""} Approved by admin`.trim()
+            : route.notes,
+      }));
+
+      const { data, error } = await supabase
+        .from("bus_route_recommendations")
+        .insert({ bus_id: busId, routes_json: normalizedRoutes })
+        .select("*")
+        .single();
+
+      if (error) throw error;
+
+      setRouteSuggestionsByBus((prev) => ({
+        ...prev,
+        [busId]: data,
+      }));
+      setAuditOptions(normalizedRoutes);
+      setAuditUpdatedAt(data.recommended_at);
+
+      const selected = normalizedRoutes.find(
+        (route) => route.route_id === selectedRouteId,
+      );
+      if (!selected) return;
+
+      const busLabel =
+        selectedBusDetails?.plate_number ?? `Bus ${busId.slice(0, 8)}`;
+      const record: ApprovedReroute = {
+        id: `${busId}-${selected.route_id}-${Date.now()}`,
+        busId,
+        busLabel,
+        routeId: selected.route_id,
+        estimatedMinutes: selected.estimated_minutes,
+        approvedAt: new Date().toISOString(),
+        note: selected.notes,
+      };
+
+      setApprovedReroutes((prev) => [record, ...prev].slice(0, 30));
+    },
+    [selectedBusDetails?.plate_number, setRouteSuggestionsByBus],
+  );
+
+  const runRouteAudit = async () => {
+    if (!selectedBusId) return;
+
+    const requestBusId = selectedBusId;
+    const requestSeq = ++auditRequestSeqRef.current;
+
+    const liveBus = buses[requestBusId];
+    const bus = fleetList.find((item) => item.id === requestBusId);
+    const defaultRoute = routesCatalog.find(
+      (route) => route.id === bus?.default_route_id,
+    );
+    const destination = extractRouteDestination(defaultRoute);
+
+    if (!liveBus) {
+      setAuditError(
+        "Live bus location is required before running route audit.",
+      );
+      return;
+    }
+
+    if (!destination) {
+      setAuditError(
+        "Set a default route with stops for this bus before running route audit.",
+      );
+      return;
+    }
+
+    setAuditLoading(true);
+    setAuditError(null);
+
+    try {
+      const response = await fetch(`${ML_API_BASE_URL}/predict/route`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bus_id: requestBusId,
+          origin_lat: liveBus.lat,
+          origin_lng: liveBus.lng,
+          dest_lat: destination.lat,
+          dest_lng: destination.lng,
+          hour_of_day: new Date().getHours(),
+          num_stops: destination.numStops,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        detail?: string;
+        routes?: RouteOption[];
+        recommended_at?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.detail || "Could not fetch route options.");
+      }
+
+      const options = Array.isArray(payload.routes)
+        ? payload.routes.slice(0, 3)
+        : [];
+      if (options.length === 0) {
+        throw new Error("No route options returned by the optimizer.");
+      }
+
+      if (auditRequestSeqRef.current !== requestSeq) {
+        return;
+      }
+
+      setRouteSuggestionsByBus((prev) => ({
+        ...prev,
+        [requestBusId]: {
+          id: `local-${Date.now()}`,
+          bus_id: requestBusId,
+          recommended_at: payload.recommended_at ?? new Date().toISOString(),
+          routes_json: options,
+        },
+      }));
+
+      if (selectedBusIdRef.current !== requestBusId) {
+        return;
+      }
+
+      setAuditOptions(options);
+      setSelectedAuditRouteId(
+        options.find((option) => option.is_recommended)?.route_id ||
+          options[0].route_id,
+      );
+      setAuditUpdatedAt(payload.recommended_at ?? new Date().toISOString());
+    } catch (error) {
+      if (auditRequestSeqRef.current !== requestSeq) {
+        return;
+      }
+
+      if (selectedBusIdRef.current !== requestBusId) {
+        return;
+      }
+      setAuditError(
+        error instanceof Error ? error.message : "Unable to run route audit.",
+      );
+    } finally {
+      if (requestSeq === auditRequestSeqRef.current) {
+        setAuditLoading(false);
+      }
+    }
+  };
+
+  const handleApproveRecommended = async () => {
+    if (
+      !selectedBusId ||
+      !recommendedRoute ||
+      selectedRouteOptions.length === 0
+    ) {
+      return;
+    }
+
+    try {
+      await persistApprovedRouteChoice(
+        selectedBusId,
+        recommendedRoute.route_id,
+        selectedRouteOptions,
+      );
+      setSelectedAuditRouteId(recommendedRoute.route_id);
+      setAuditError(null);
+    } catch (error) {
+      setAuditError(
+        error instanceof Error
+          ? error.message
+          : "Could not save approved route.",
+      );
+    }
+  };
+
+  const approveAuditSelection = async () => {
+    if (!selectedBusId || !selectedAuditRouteId || auditOptions.length === 0) {
+      return;
+    }
+
+    try {
+      await persistApprovedRouteChoice(
+        selectedBusId,
+        selectedAuditRouteId,
+        auditOptions,
+      );
+      setAuditError(null);
+    } catch (error) {
+      setAuditError(
+        error instanceof Error
+          ? error.message
+          : "Could not save approved route.",
+      );
+    }
+  };
+
+  const dismissSuggestion = () => {
+    if (!selectedBusId) return;
+    setRouteSuggestionsByBus((prev) => {
+      const next = { ...prev };
+      delete next[selectedBusId];
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (activeTab === "fleet" && followLiveTracking && mapFocus) {
+      setMapFocus(null);
+    }
+  }, [activeTab, followLiveTracking, mapFocus]);
+
+  const followCenter: [number, number] | null = selectedBusLocation
+    ? [selectedBusLocation.lat, selectedBusLocation.lng]
+    : activeBuses.length > 0
       ? [activeBuses[0].lat, activeBuses[0].lng]
-      : [30.6942, 76.8606];
+      : null;
+
+  const saved = getSavedMapView();
+  const defaultCenter: [number, number] = saved
+    ? [saved.lat, saved.lng]
+    : activeBuses.length > 0
+      ? [activeBuses[0].lat, activeBuses[0].lng]
+      : [31.326, 75.5762];
+  const defaultZoom = saved?.zoom ?? 13;
+
+  const showStudentsOnMap = activeTab === "students" || activeTab === "routes";
+  const studentsWithLocation = allStudents.filter(
+    (student) => student.lat != null && student.lng != null,
+  );
 
   return (
-    <div className="flex h-screen w-screen m-0 bg-[#f5f7fa]">
-      <div className="w-[380px] bg-white text-gray-800 shadow-[4px_0_15px_rgba(0,0,0,0.05)] z-10 flex flex-col">
-        <div className="p-8 bg-[#1a237e] text-white flex justify-between items-center">
-          <div>
-            <h1 className="m-0 text-[28px] font-extrabold">ShieldTrack</h1>
-            <p className="m-0 mt-1 opacity-90 text-sm">
-              Institute: {instituteCode}
-            </p>
-          </div>
+    <div className="flex h-screen w-screen m-0 bg-[#f5f7fa] overflow-hidden">
+      <DashboardSidebar
+        tenantId={tenantId}
+        instituteCode={instituteCode}
+        isSidebarCollapsed={isSidebarCollapsed}
+        activeTab={activeTab}
+        mapClickActive={mapClickActive}
+        fleetCount={fleetList.length}
+        trackingCount={activeBuses.length}
+        studentCount={allStudents.length}
+        onCollapseSidebar={() => setIsSidebarCollapsed(true)}
+        onLogout={handleLogout}
+        onSetActiveTab={setActiveTab}
+        onCancelMapClick={handleCancelMapClick}
+        onRequestMapClick={handleRequestMapClick}
+        onUpdateStops={setBuilderStops}
+        onUpdatePolyline={setBuilderPolyline}
+        onFocusLocation={(lat, lng) => setMapFocus([lat, lng])}
+      />
+
+      <div className="flex-1 relative overflow-hidden">
+        {isSidebarCollapsed && (
           <button
-            onClick={handleLogout}
-            className="p-2 bg-red-500 rounded text-white text-xs hover:bg-red-600 transition"
+            onClick={() => setIsSidebarCollapsed(false)}
+            className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-[#1a237e] text-white rounded-xl shadow-2xl z-1200 flex items-center justify-center cursor-pointer hover:bg-indigo-900 transition-all hover:scale-105 border-none active:scale-95"
+            title="Expand dashboard"
           >
-            Logout
+            <PiCaretRightBold size={20} />
           </button>
-        </div>
+        )}
 
-        {/* --- 1. BUS REGISTRATION FORM --- */}
-        <div className="p-5 bg-indigo-50 border-b border-indigo-200 text-gray-800">
-          <h3 className="m-0 mb-2.5 text-[15px] font-bold text-[#1a237e]">
-            ➕ Register New Vehicle
-          </h3>
-          <form onSubmit={handleRegisterBus} className="flex gap-2.5">
-            <input
-              type="text"
-              placeholder="Plate Number"
-              value={newPlateNumber}
-              onChange={(e) => setNewPlateNumber(e.target.value)}
-              className="flex-1 p-2 rounded-md border border-gray-300 text-gray-800 bg-white min-w-0"
-            />
-            <input
-              type="number"
-              placeholder="Capacity"
-              value={newBusCapacity}
-              onChange={(e) => setNewBusCapacity(e.target.value)}
-              className="w-20 p-2 rounded-md border border-gray-300 text-gray-800 bg-white"
-              min="10"
-              max="150"
-            />
-            <button
-              type="submit"
-              className="px-3 py-2 bg-green-500 text-black font-bold border-none rounded-md cursor-pointer hover:bg-green-600 transition shrink-0"
-            >
-              Add
-            </button>
-          </form>
-        </div>
+        <DashboardMap
+          defaultCenter={defaultCenter}
+          defaultZoom={defaultZoom}
+          activeTab={activeTab}
+          followLiveTracking={followLiveTracking}
+          followCenter={followCenter}
+          mapClickActive={mapClickActive}
+          mapFocus={mapFocus}
+          onMapClick={mapClickHandler}
+          onMapDrag={() => setFollowLiveTracking(false)}
+          activeBuses={activeBuses}
+          fleetList={fleetList}
+          etaByBus={etaByBus}
+          showStudentsOnMap={showStudentsOnMap}
+          studentsWithLocation={studentsWithLocation}
+          builderStops={builderStops}
+          builderPolyline={builderPolyline}
+          placementPreview={placementPreview}
+        />
 
-        {/* --- 2. STUDENT REGISTRATION FORM --- */}
-        <div className="p-5 bg-fuchsia-100 border-b border-fuchsia-200 text-gray-800">
-          <h3 className="m-0 mb-2.5 text-[15px] font-bold text-[#1a237e]">
-            👨‍🎓 Assign Student to Route
-          </h3>
-          <form
-            onSubmit={handleRegisterStudent}
-            className="flex flex-col gap-2.5"
+        {activeTab === "fleet" && (
+          <button
+            type="button"
+            onClick={() => setFollowLiveTracking((prev) => !prev)}
+            className={`absolute bottom-6 right-6 z-1000 px-4 py-3 rounded-full border-none shadow-xl transition-all cursor-pointer flex items-center gap-2 font-semibold text-sm ${
+              followLiveTracking
+                ? "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/30"
+                : "bg-white text-gray-700 hover:bg-gray-50"
+            }`}
+            title="Toggle live bus follow mode"
           >
-            <input
-              type="text"
-              placeholder="Student Name"
-              value={newStudentName}
-              onChange={(e) => setNewStudentName(e.target.value)}
-              className="p-2 rounded-md border border-gray-300 text-gray-800 bg-white"
+            <div
+              className={`w-2.5 h-2.5 rounded-full ${
+                followLiveTracking
+                  ? "bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]"
+                  : "bg-gray-400"
+              }`}
             />
-            <div className="flex gap-2.5">
-              <select
-                value={assignRouteId}
-                onChange={(e) => setAssignRouteId(e.target.value)}
-                className="flex-1 p-2 rounded-md border border-gray-300 text-gray-800 bg-white"
-              >
-                <option value="">Select a Route...</option>
-                {routeList.map((route) => (
-                  <option key={route.id} value={route.id}>
-                    {route.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-purple-600 text-white font-bold border-none rounded-md cursor-pointer hover:bg-purple-700 transition"
-              >
-                Assign
-              </button>
-            </div>
-          </form>
-        </div>
+            {followLiveTracking ? "Live Tracking" : "Live Track"}
+          </button>
+        )}
 
-        <div className="p-4 px-5 border-b border-gray-200 text-sm text-gray-800">
-          <p className="m-0 font-bold">
-            Official Registered Fleet: {fleetList.length} Buses
-          </p>
-          <p className="m-0 text-green-600 font-bold">
-            Currently Tracking: {activeBuses.length}
-          </p>
-        </div>
+        {activeTab === "fleet" && (
+          <LiveInsightsPanel
+            activeBusIds={activeBusIds}
+            fleetList={fleetList}
+            selectedBusId={selectedBusId}
+            selectedEta={selectedEta}
+            recommendedRoute={recommendedRoute}
+            approvedReroutes={approvedReroutes}
+            auditOptions={auditOptions}
+            selectedAuditRouteId={selectedAuditRouteId}
+            auditUpdatedAt={auditUpdatedAt}
+            auditLoading={auditLoading}
+            auditError={auditError}
+            onSelectBus={setSelectedInsightBusId}
+            onApproveRecommended={handleApproveRecommended}
+            onDismissSuggestion={dismissSuggestion}
+            onRunRouteAudit={runRouteAudit}
+            onSelectAuditRoute={setSelectedAuditRouteId}
+            onApproveAuditSelection={approveAuditSelection}
+            toNumber={toNumber}
+            formatTime={formatTime}
+            getConfidenceMeta={getConfidenceMeta}
+          />
+        )}
 
-        <div className="p-5 flex-1 overflow-y-auto">
-          {activeBuses.map((busLoc) => {
-            const busDetails = fleetList.find((b) => b.id === busLoc.bus_id);
-            const title = busDetails
-              ? busDetails.plate_number
-              : busLoc.bus_id.slice(0, 8);
-
-            return (
-              <div
-                key={busLoc.bus_id}
-                className="bg-white p-4 rounded-xl mb-4 border-l-[6px] border-l-green-500 border border-gray-100 shadow-sm"
-              >
-                <div className="flex justify-between mb-2.5">
-                  <span className="text-lg font-black text-black">{title}</span>
-                  <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-50 text-green-800">
-                    ACTIVE
-                  </span>
-                </div>
-                <p className="m-0 my-1 text-sm text-gray-600">
-                  💨 Speed: <b>{busLoc.speed_kmh} km/h</b>
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="flex-1">
-        <MapContainer center={activeBusPos} zoom={15} className="h-full w-full">
-          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          {activeBuses.map((busLoc) => {
-            const busDetails = fleetList.find((b) => b.id === busLoc.bus_id);
-            const title = busDetails ? busDetails.plate_number : "Unknown Bus";
-            return (
-              <Marker
-                key={busLoc.bus_id}
-                position={[busLoc.lat, busLoc.lng]}
-                icon={busIcon}
-              >
-                <Popup>
-                  <b>{title}</b>
-                  <br />
-                  Speed: {busLoc.speed_kmh} km/h
-                </Popup>
-              </Marker>
-            );
-          })}
-          <FollowBus center={activeBusPos} />
-        </MapContainer>
+        <MapLegend
+          showStudentsOnMap={showStudentsOnMap}
+          showRoutePath={builderPolyline.length >= 2}
+        />
       </div>
     </div>
   );

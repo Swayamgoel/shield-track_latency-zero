@@ -35,7 +35,7 @@ export default function LoginScreen() {
     <div className="flex h-screen items-center justify-center bg-gray-100">
       <form
         onSubmit={handleLogin}
-        className="bg-white p-10 rounded-xl text-center shadow-lg w-[350px]"
+        className="bg-white p-10 rounded-xl text-center shadow-lg w-87.5"
       >
         <h2 className="m-0 mb-2.5 text-[#1a237e] text-2xl font-bold">
           🛡️ ShieldTrack Admin
@@ -43,7 +43,7 @@ export default function LoginScreen() {
         <p className="text-gray-500 mb-5">
           Enter Admin Credentials to Access the Dashboard.
         </p>
-        
+
         {errorMsg && (
           <div className="mb-4 p-2 bg-red-100 text-red-700 rounded-md text-sm text-left">
             {errorMsg}
@@ -51,7 +51,10 @@ export default function LoginScreen() {
         )}
 
         <div className="text-left mb-3">
-          <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-1">
+          <label
+            htmlFor="email"
+            className="block text-sm font-semibold text-gray-700 mb-1"
+          >
             Email Address
           </label>
           <input
@@ -66,7 +69,10 @@ export default function LoginScreen() {
         </div>
 
         <div className="text-left mb-5">
-          <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1">
+          <label
+            htmlFor="password"
+            className="block text-sm font-semibold text-gray-700 mb-1"
+          >
             Password
           </label>
           <input
