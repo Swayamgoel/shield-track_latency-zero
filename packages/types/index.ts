@@ -91,6 +91,7 @@ export interface DeviationAlert {
 export interface DriverLoginRequest {
   email: string;
   institute_code: string;
+  device_id: string;
 }
 
 export interface ParentLoginRequest {

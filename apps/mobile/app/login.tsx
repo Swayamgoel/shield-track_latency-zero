@@ -8,14 +8,26 @@ import {
 	TextInput,
 	View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 
 import { apiClient } from '../lib/api';
 import { saveSession } from '../lib/session';
 
-const getDeviceId = (): string | undefined => {
-	// TODO: Plug in a device ID source when available.
-	return undefined;
+const DRIVER_DEVICE_KEY = 'shieldtrack.driver.device_id.v1';
+
+const getDeviceId = async (): Promise<string | undefined> => {
+	try {
+		const existingId = await AsyncStorage.getItem(DRIVER_DEVICE_KEY);
+		if (existingId) return existingId;
+
+		const platformPrefix = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'device';
+		const generatedId = `${platformPrefix}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2, 10)}`;
+		await AsyncStorage.setItem(DRIVER_DEVICE_KEY, generatedId);
+		return generatedId;
+	} catch {
+		return undefined;
+	}
 };
 
 export default function LoginScreen() {
@@ -42,10 +54,18 @@ export default function LoginScreen() {
 		setSubmitting(true);
 		setError(null);
 
+		const deviceId = mode === 'driver' ? await getDeviceId() : undefined;
+		if (mode === 'driver' && !deviceId) {
+			setError('Unable to read device identity. Please retry on a physical device.');
+			setSubmitting(false);
+			return;
+		}
+
 		const result = mode === 'driver'
 			? await apiClient.login({
 					email: email.trim(),
 					institute_code: driverInstituteCode.trim(),
+					device_id: deviceId!,
 			  })
 			: await apiClient.parentLogin({
 					institute_code: instituteCode.trim(),

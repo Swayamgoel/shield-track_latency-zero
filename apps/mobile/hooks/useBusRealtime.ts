@@ -78,9 +78,27 @@ export function useBusRealtime({
   const speedHistory = useRef<number[]>([]);
 
   useEffect(() => {
-    if (!busId) return;
+    if (!busId) {
+      speedHistory.current = [];
+      setLocation(null);
+      setBusOnline(false);
+      setEta({ etaMinutes: null, etaTime: null });
+      setSosEvent(null);
+      setDeviationAlert(null);
+      setConnected(false);
+      return;
+    }
 
     const seedLatestLocation = async () => {
+      const { data: activeTrip } = await supabase
+        .from('trips')
+        .select('id')
+        .eq('bus_id', busId)
+        .eq('status', 'active')
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       const { data, error } = await supabase
         .from('bus_locations')
         .select('lat, lng, speed_kmh, recorded_at')
@@ -89,7 +107,13 @@ export function useBusRealtime({
         .limit(1)
         .maybeSingle();
 
-      if (error || !data) return;
+      if (error || !data) {
+        speedHistory.current = [];
+        setLocation(null);
+        setEta({ etaMinutes: null, etaTime: null });
+        setBusOnline(Boolean(activeTrip));
+        return;
+      }
 
       speedHistory.current = [data.speed_kmh];
       setLocation({
@@ -98,7 +122,7 @@ export function useBusRealtime({
         speed_kmh: data.speed_kmh,
         recorded_at: data.recorded_at,
       });
-      setBusOnline(true);
+      setBusOnline(Boolean(activeTrip));
       setEta(computeETA(data.speed_kmh, distanceMetres));
     };
 
@@ -166,6 +190,24 @@ export function useBusRealtime({
           const event = payload.new as DeviationAlert;
           setDeviationAlert(event);
           upsertAlert({ kind: 'deviation', data: event });
+        },
+      )
+      // ── trips status change → set live/offline state for marker mode ─────
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'trips',
+          filter: `bus_id=eq.${busId}`,
+        },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as Partial<{ status: string }>;
+          if (row.status === 'active') {
+            setBusOnline(true);
+          } else {
+            setBusOnline(false);
+          }
         },
       )
       .subscribe((status) => {

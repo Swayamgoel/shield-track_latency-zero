@@ -102,11 +102,11 @@ router.post('/login', async (req, res) => {
 // POST /auth/driver-login
 router.post('/driver-login', async (req, res) => {
 	const payload: DriverLoginRequest = req.body;
-	const { email, institute_code } = payload;
+	const { email, institute_code, device_id } = payload;
 
 	// 1. Validate inputs
-	if (!email || !institute_code) {
-		return res.status(400).json({ error: { message: 'Email and Institute Code are required' } });
+	if (!email || !institute_code || !device_id) {
+		return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Email, Institute Code, and Device ID are required' } });
 	}
 
 	try {
@@ -124,7 +124,7 @@ router.post('/driver-login', async (req, res) => {
 		// 3. Verify driver exists in users table for this tenant
 		const { data: driver, error: driverError } = await supabaseAdmin
 			.from('users')
-			.select('id, email, tenant_id')
+			.select('id, email, tenant_id, device_id')
 			.eq('email', email.toLowerCase())
 			.eq('tenant_id', tenant.id)
 			.eq('role', 'driver')
@@ -132,6 +132,30 @@ router.post('/driver-login', async (req, res) => {
 
 		if (driverError || !driver) {
 			return res.status(401).json({ error: { message: 'No driver found with this email' } });
+		}
+
+		const normalizedDeviceId = device_id.trim();
+
+		if (driver.device_id && driver.device_id !== normalizedDeviceId) {
+			return res.status(401).json({
+				error: {
+					code: 'DEVICE_MISMATCH',
+					message: 'This account is already linked to another device.',
+				},
+			});
+		}
+
+		if (!driver.device_id) {
+			const { error: bindError } = await supabaseAdmin
+				.from('users')
+				.update({ device_id: normalizedDeviceId })
+				.eq('id', driver.id)
+				.eq('tenant_id', tenant.id);
+
+			if (bindError) {
+				console.error('Driver device bind failed:', bindError);
+				return res.status(500).json({ error: { message: 'Could not bind device to driver account' } });
+			}
 		}
 
 		// 4. Mint JWT
